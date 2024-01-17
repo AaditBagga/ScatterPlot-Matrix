@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Scatterplot Matrix with Cars Dataset</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <h1> Scatterplot Matrix of the Cars Dataset </h1s>
+  <style>
+    circle {
+      fill-opacity: 0.6;
+    }
+
+    .grid-line {
+      stroke: green;
+      stroke-width: 1;
+    }
+
+  </style>
+</head>
+<body>
+<script>
+  // Parameters
+  const margin = {top: 60, right: 20, bottom: 20, left: 60};
+  const size = 200;
+  const padding = 10;
+  const attributes = ['economy_mpg', 'cylinders', 'displacement_cc', 'power_hp', 'weight_lb', 'speed_sec'];
+  const n = attributes.length;
+  const labels = {
+    'economy_mpg': 'Economy (MPG)',
+    'cylinders': 'Cylinders',
+    'displacement_cc': 'Displacement (cc)',
+    'power_hp': 'Power (HP)',
+    'weight_lb': 'Weight (lb)',
+    'speed_sec': 'Speed (0-60 mph)(sec)'
+  };
+
+  // Read and process data
+  d3.csv('cars.csv').then(data => {
+    data.forEach(d => {
+      d.economy_mpg = +d.economy_mpg;
+      d.cylinders = +d.cylinders;
+      d.displacement_cc = +d.displacement_cc;
+      d.power_hp = +d.power_hp;
+      d.weight_lb = +d.weight_lb;
+      d.speed_sec = +d.speed_sec;
+    });
+
+    // Compute statistics
+    const stats = {};
+    attributes.forEach(attr => {
+      stats[attr] = {
+        mean: d3.mean(data, d => d[attr]),
+        stdDev: d3.deviation(data, d => d[attr])
+      };
+    });
+
+    // Build scatterplot matrix
+    const svg = d3.select('body').append('svg')
+      .attr('width', size * n + margin.left + margin.right)
+      .attr('height', size * n + margin.top + margin.bottom)
+      .style('font', '10px sans-serif')
+      .style('text-anchor', 'middle')
+      .style('background-color', '#F9D7CF');
+
+    const xScales = {};
+    const yScales = {};
+
+    attributes.forEach((attr, i) => {
+      xScales[attr] = d3.scaleLinear()
+        .domain(d3.extent(data, d => d[attr]))
+        .range([padding / 2, size - padding / 2]);
+
+      yScales[attr] = d3.scaleLinear()
+        .domain(d3.extent(data, d => d[attr]))
+        .range([size - padding / 2, padding / 2]);
+    });
+
+    // Add green lines to form a square grid
+    for (let i = 1; i < n; i++) {
+      svg.append('line')
+        .attr('class', 'grid-line')
+        .attr('x1', margin.left + i * size)
+        .attr('y1', margin.top)
+        .attr('x2', margin.left + i * size)
+        .attr('y2', margin.top + size * n);
+
+      svg.append('line')
+        .attr('class', 'grid-line')
+        .attr('x1', margin.left)
+        .attr('y1', margin.top + i * size)
+        .attr('x2', margin.left + size * n)
+        .attr('y2', margin.top + i * size);
+    }
+
+    attributes.forEach((attrY, row) => {
+      attributes.forEach((attrX, col) => {
+        const cell = svg.append('g')
+          .attr('transform', `translate(${margin.left + col * size},${margin.top + row * size})`);
+
+        // Non-diagonal entries
+        if (row !== col) {
+          cell.selectAll('circle')
+            .data(data)
+            .join('circle')
+            .attr('cx', d => xScales[attrX](d[attrX]))
+            .attr('cy', d => yScales[attrY](d[attrY]))
+            .attr('r', 2)
+            .attr('fill', 'red');
+        }
+        // Diagonal entries (histograms)
+        else {
+          const histogram = d3.histogram()
+            .domain(xScales[attrX].domain())
+            .thresholds(xScales[attrX].ticks(30));
+
+
+          const bins = histogram(data.map(d => d[attrX]));
+
+          const yScaleHist = d3.scaleLinear()
+            .domain([0, d3.max(bins, d => d.length)])
+            .range([size - padding / 2, padding / 2]);
+
+          cell.selectAll('rect')
+            .data(bins)
+            .join('rect')
+            .attr('x', d => xScales[attrX](d.x0))
+            .attr('y', d => yScaleHist(d.length))
+            .attr('width', d => xScales[attrX](d.x1) - xScales[attrX](d.x0) - 1)
+            .attr('height', d => size - padding / 2 - yScaleHist(d.length))
+            .attr('fill', 'red');
+        }
+
+        // Add axis labels
+        if (row === 0) {
+          svg.append('text')
+            .attr('x', margin.left + col * size + size / 2)
+            .attr('y', margin.top - padding / 2)
+
+            .text(labels[attrX]);
+        }
+
+        if (col === 0) {
+          const label = svg.append('text')
+            .attr('x', margin.left - padding / 2)
+            .attr('y', margin.top + row * size + size / 2)
+
+            .text(labels[attrY]);
+
+          label.attr('transform', `rotate(-90, ${margin.left - padding / 2}, ${margin.top + row * size + size / 2})`);
+        }
+      });
+    });
+  });
+</script>
+</body>
+</html>
+
+
